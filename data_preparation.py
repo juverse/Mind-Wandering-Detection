@@ -50,56 +50,11 @@ def vid_nec(df):
     df_vid_final = df.loc[(df_event_end_trial > start_obs) & (df_event_end_trial <= end_obs), :]
     return df_vid_final
 
-## necessary data
-df_vid1 = pd.DataFrame(df_split.get_group("vid1"))
-df_vid1_nec = vid_nec(df_vid1)
-
-df_vid2 = pd.DataFrame(df_split.get_group("vid2"))
-df_vid2_nec = vid_nec(df_vid2)
-
-df_vid3 = pd.DataFrame(df_split.get_group("vid3"))
-df_vid3_nec = vid_nec(df_vid3)
-
-df_vid4 = pd.DataFrame(df_split.get_group("vid4"))
-df_vid4_nec = vid_nec(df_vid4)
-
-df_vid5 = pd.DataFrame(df_split.get_group("vid5"))
-df_vid5_nec = vid_nec(df_vid5)
-
-df_vid6 = pd.DataFrame(df_split.get_group("vid6"))
-df_vid6_nec = vid_nec(df_vid6)
-
-df_vid7 = pd.DataFrame(df_split.get_group("vid7"))
-df_vid7_nec = vid_nec(df_vid7)
-
-df_vid8 = pd.DataFrame(df_split.get_group("vid8"))
-df_vid8_nec = vid_nec(df_vid8)
-
-df_vid9 = pd.DataFrame(df_split.get_group("vid9"))
-df_vid9_nec = vid_nec(df_vid9)
-
-df_vid10 = pd.DataFrame(df_split.get_group("vid10"))
-df_vid10_nec = vid_nec(df_vid10)
-
-df_vid11 = pd.DataFrame(df_split.get_group("vid11"))
-df_vid11_nec = vid_nec(df_vid11)
-
-df_vid12 = pd.DataFrame(df_split.get_group("vid12"))
-df_vid12_nec = vid_nec(df_vid12)
-
-df_vid13 = pd.DataFrame(df_split.get_group("vid13"))
-df_vid13_nec = vid_nec(df_vid13)
-
-df_vid14 = pd.DataFrame(df_split.get_group("vid14"))
-df_vid14_nec = vid_nec(df_vid14)
-
-df_vid15 = pd.DataFrame(df_split.get_group("vid15"))
-df_vid15_nec = vid_nec(df_vid15)
-
-##all necessary datas together
-df_concat = pd.concat([df_vid1_nec, df_vid2_nec, df_vid3_nec, df_vid4_nec, df_vid5_nec, df_vid6_nec, 
-df_vid7_nec,df_vid8_nec, df_vid9_nec, df_vid10_nec, df_vid11_nec, df_vid12_nec, df_vid13_nec, df_vid14_nec,
- df_vid15_nec])
+## necessary data together
+df_concat = pd.DataFrame()
+for i in range(1,16):
+    df_temp = pd.DataFrame(df_split.get_group("vid" +str(i)))
+    df_concat = pd.concat([df_concat, vid_nec(df_temp)])
 
 ### prepare eye traacking data ###
 
@@ -114,17 +69,16 @@ df_vid7_nec,df_vid8_nec, df_vid9_nec, df_vid10_nec, df_vid11_nec, df_vid12_nec, 
 blink_duration = df_concat.loc[df_concat["Category"] == "Blink", :]
 blink_threshold = 500
 
-# df without to long blinks
+# df without too long blinks
 df_concat_blink = df_concat.loc[(df_concat["Category"] != "Blink") |
                                 ((df_concat["Category"] == "Blink") & (df_concat["Event Duration [ms]"] < blink_threshold))]
 
-## combine left/right eye => just take one eye for statistics
-#split data in right an dleft eye
+## split data in right and left eye => just take one eye for statistics
 df_final_left = df_concat_blink.loc[df_concat_blink["Eye L/R"] == "Left", :]
 df_final_right = df_concat_blink.loc[df_concat_blink["Eye L/R"] == "Right", :]
 
 
-### summary statistics ###
+### summary statistics for Left Eye###
 
 #groupby left for the videos
 df_final_left_groups_sti = df_final_left.groupby("Stimulus") 
@@ -134,33 +88,34 @@ df_final_left_groups_sti_cat = df_final_left.groupby(["Stimulus", "Category"])
 df_summary_stat_left = pd.DataFrame()
 
 ## add general information
-df_summary_stat_left["Tracking Ratio [%] Mean"] = df_final_left_groups_sti["Tracking Ratio [%]"].mean()# per group.mean()
+df_summary_stat_left["Tracking Ratio [%] Mean"] = df_final_left_groups_sti["Tracking Ratio [%]"].mean()
 df_summary_stat_left["Participant"] = [df_initial.loc[1,"Participant"]] * 15
 
 ## Features
+#statistics I want for all features
+statistics = ["mean", "max", "min", "median", "std", "skew", lambda x: x.quantile(0.25),lambda x: x.quantile(0.75)]
+#kurtosis
+def get_kurtosis(feature):
+    return df_final_left_groups_sti[feature].apply(pd.DataFrame.kurt).values
+
+
 ## Duration:
 # Fixation Duration
-# 1.step: calcaulte the statistics
-event_duration = df_final_left_groups_sti_cat.agg({"Event Duration [ms]": ["mean", "max", "min", "median", "std", "skew", lambda x: x.quantile(0.25),
-lambda x: x.quantile(0.75)]})
+# # 1.step: calcaulte the statistics 
+event_duration = df_final_left_groups_sti_cat.agg({"Event Duration [ms]": statistics})
 
 # 2. to get dataframe after aggretaion with two groups
 event_duration.columns = ['Event_duration_mean', "Event_duration_max", "Event_duration_min", "Event_duration_median", "Event_duration_std", "Event_duration_skew",
 "Event_duration_q25", "Event_duration_q75"]
 event_duration = event_duration.reset_index()
 
-# kurtosis
-kurt = df_final_left_groups_sti_cat["Event Duration [ms]"].apply(pd.DataFrame.kurt)
-kurt = kurt.reset_index()
-# Fixation
-df_summary_stat_left["Fixation Duration Kurtosis [ms]"] = kurt.loc[kurt["Category"]=="Fixation", "Event Duration [ms]"].values
-# Saccade
-df_summary_stat_left["Saccade Duration Kurtosis [ms]"] = kurt.loc[kurt["Category"]=="Saccade", "Event Duration [ms]"].values
-# Blink
-df_summary_stat_left["Blink Duration Kurtosis [ms]"] = kurt.loc[kurt["Category"]=="Blink", "Event Duration [ms]"].values
-#values otherwise we would add NaN, because of the indexes
-
 # 3. add Fixation duration to dataframe
+def get_event_duration(event):
+    return event_duration.loc[event_duration["Category"] == event, ["Event_duration_mean", "Event_duration_max", "Event_duration_min",
+                                                                 "Event_duration_median","Event_duration_std", "Event_duration_skew",
+                                                                 "Event_duration_q25", "Event_duration_q75"]].values
+ 
+
 df_summary_stat_left[["Fixation Duration Mean [ms]", 
                         "Fixation Duration Max [ms]", 
                         "Fixation Duration Min [ms]",
@@ -168,10 +123,7 @@ df_summary_stat_left[["Fixation Duration Mean [ms]",
                         "Fixation Duration Std [ms]",
                         "Fixation Duration Skew [ms]",
                         "Fixation Duration Quantil 25 [ms]",
-                        "Fixation Duration Quantil 75 [ms]"]] = event_duration.loc[event_duration["Category"] == "Fixation",
-                                                                 ["Event_duration_mean", "Event_duration_max", "Event_duration_min",
-                                                                 "Event_duration_median","Event_duration_std", "Event_duration_skew",
-                                                                 "Event_duration_q25", "Event_duration_q75"]].values
+                        "Fixation Duration Quantil 75 [ms]"]] = get_event_duration("Fixation") 
 # index matching causes Nan values, we havt to drop out the indexes, so we can add the values or we just take the values!
 
 ## Saccade Duration
@@ -183,11 +135,17 @@ df_summary_stat_left[["Saccade Duration Mean [ms]",
                         "Saccade Duration Std [ms]",
                         "Saccade Duration Skew [ms]",
                         "Saccade Duration Quantil 25 [ms]",
-                        "Saccade Duration Quantil 75 [ms]"]] = event_duration.loc[event_duration["Category"] == "Saccade",
-                                                                 ["Event_duration_mean", "Event_duration_max", "Event_duration_min",
-                                                                 "Event_duration_median","Event_duration_std", "Event_duration_skew",
-                                                                 "Event_duration_q25", "Event_duration_q75"]].values #.reset_index()
+                        "Saccade Duration Quantil 75 [ms]"]] = get_event_duration("Saccade") 
 # index matching causes Nan values, we havt to drop out the indexes, so we can add the values or we just take the values!
+
+# kurtosis
+kurt = df_final_left_groups_sti_cat["Event Duration [ms]"].apply(pd.DataFrame.kurt)
+kurt = kurt.reset_index()
+# add to dataframe 
+df_summary_stat_left["Fixation Duration Kurtosis [ms]"] = kurt.loc[kurt["Category"]=="Fixation", "Event Duration [ms]"].values
+df_summary_stat_left["Saccade Duration Kurtosis [ms]"] = kurt.loc[kurt["Category"]=="Saccade", "Event Duration [ms]"].values
+df_summary_stat_left["Blink Duration Kurtosis [ms]"] = kurt.loc[kurt["Category"]=="Blink", "Event Duration [ms]"].values
+#values otherwise we would add NaN, because of the indexes
 
 ## Mean Duration of Blink
 #brauche ich hier die anderen-> max, min??
@@ -198,22 +156,21 @@ df_summary_stat_left[["Blink Duration Mean [ms]",
                         "Blink Duration Std [ms]",
                         "Blink Duration Skew [ms]",
                         "Blink Duration Quantil 25 [ms]",
-                        "Blink Duration Quantil 75 [ms]"]] = event_duration.loc[event_duration["Category"] == "Blink",
-                                                                 ["Event_duration_mean", "Event_duration_max", "Event_duration_min",
-                                                                 "Event_duration_median","Event_duration_std", "Event_duration_skew",
-                                                                 "Event_duration_q25", "Event_duration_q75"]].values
+                        "Blink Duration Quantil 75 [ms]"]] = get_event_duration("Blink")
 
-## saccade fixation ratio saccade duration/fixation duration
+## saccade fixation ratio
 #Das Verhältnis zweier Zahlen zeigt, wie viel Mal die erste Zahl größer ist
 #als die zweite oder welchen Anteil die erste Zahl von der zweiten ausmacht.
+def get_sacc_fix_ratio(fix, sacc):
+    return df_summary_stat_left[fix]/df_summary_stat_left[sacc]
 
-df_summary_stat_left["Fixation Saccade Ratio Mean"] = df_summary_stat_left["Fixation Duration Mean [ms]"]/df_summary_stat_left["Saccade Duration Mean [ms]"]
-df_summary_stat_left["Fixation Saccade Ratio Max"] = df_summary_stat_left["Fixation Duration Max [ms]"]/df_summary_stat_left["Saccade Duration Max [ms]"]
-df_summary_stat_left["Fixation Saccade Ratio Min"] = df_summary_stat_left["Fixation Duration Min [ms]"]/df_summary_stat_left["Saccade Duration Min [ms]"]
-df_summary_stat_left["Fixation Saccade Ratio Median"] = df_summary_stat_left["Fixation Duration Median [ms]"]/df_summary_stat_left["Saccade Duration Median [ms]"]
-df_summary_stat_left["Fixation Saccade Ratio Std"] = df_summary_stat_left["Fixation Duration Std [ms]"]/df_summary_stat_left["Saccade Duration Std [ms]"]
-df_summary_stat_left["Fixation Saccade Ratio Skew"] = df_summary_stat_left["Fixation Duration Skew [ms]"]/df_summary_stat_left["Saccade Duration Skew [ms]"]
-df_summary_stat_left["Fixation Saccade Ratio Kurtosis"] = df_summary_stat_left["Fixation Duration Kurtosis [ms]"]/df_summary_stat_left["Saccade Duration Kurtosis [ms]"].values
+df_summary_stat_left["Fixation Saccade Ratio Mean"] = get_sacc_fix_ratio("Fixation Duration Mean [ms]","Saccade Duration Mean [ms]")
+df_summary_stat_left["Fixation Saccade Ratio Max"] = get_sacc_fix_ratio("Fixation Duration Max [ms]", "Saccade Duration Max [ms]")
+df_summary_stat_left["Fixation Saccade Ratio Min"] = get_sacc_fix_ratio("Fixation Duration Min [ms]","Saccade Duration Min [ms]" )
+df_summary_stat_left["Fixation Saccade Ratio Median"] = get_sacc_fix_ratio("Fixation Duration Median [ms]","Saccade Duration Median [ms]" )
+df_summary_stat_left["Fixation Saccade Ratio Std"] = get_sacc_fix_ratio("Fixation Duration Std [ms]", "Saccade Duration Std [ms]")
+df_summary_stat_left["Fixation Saccade Ratio Skew"] = get_sacc_fix_ratio("Fixation Duration Skew [ms]","Saccade Duration Skew [ms]" )
+df_summary_stat_left["Fixation Saccade Ratio Kurtosis"] = get_sacc_fix_ratio("Fixation Duration Kurtosis [ms]","Saccade Duration Kurtosis [ms]") #.values
 
 ## Fixation Number
 # take on fixation value and count how often it appears
@@ -225,8 +182,7 @@ blink_count = df_final_left_groups_sti_cat.count()["Trial"][:, "Blink"]
 df_summary_stat_left["Blink Number"] = blink_count
 
 ## Fixation Dispersion x und y
-fix_dis_x_y = df_final_left_groups_sti.agg({"Fixation Dispersion X [px]": ["mean", "max", "min", "median", "std", "skew", lambda x: x.quantile(0.25), lambda x: x.quantile(0.75)], 
-"Fixation Dispersion Y [px]": ["mean", "max", "min", "median", "std", "skew", lambda x: x.quantile(0.25), lambda x: x.quantile(0.75)] })
+fix_dis_x_y = df_final_left_groups_sti.agg({"Fixation Dispersion X [px]": statistics, "Fixation Dispersion Y [px]": statistics })
 
 fix_dis_x_y.columns = ['fix_dis_x_mean', "fix_dis_x_max", "fix_dis_x_min", "fix_dis_x_median", "fix_dis_x_std", "fix_dis_x_skew", "fix_dis_x_q25","fix_dis_x_q75",
 'fix_dis_y_mean', "fix_dis_y_max", "fix_dis_y_min", "fix_dis_y_median", "fix_dis_y_std", "fix_dis_y_skew", "fix_dis_y_q25", "fix_dis_y_q75"]
@@ -239,6 +195,7 @@ df_summary_stat_left[["Fixation Dispersion X Mean [px]",
                         "Fixation Dispersion X Skew [px]",
                         "Fixation Dispersion X Quantil 25 [px]",
                         "Fixation Dispersion X Quantil 75 [px]",
+                        
                         "Fixation Dispersion Y Mean [px]", 
                         "Fixation Dispersion Y Max [px]", 
                         "Fixation Dispersion Y Min [px]",
@@ -248,11 +205,11 @@ df_summary_stat_left[["Fixation Dispersion X Mean [px]",
                         "Fixation Dispersion Y Quantil 25 [px]",
                         "Fixation Dispersion Y Quantil 75 [px]"]] = fix_dis_x_y
 
-df_summary_stat_left["Fixation Dispersion X Kurtosis [px]"] = df_final_left_groups_sti["Fixation Dispersion X [px]"].apply(pd.DataFrame.kurt).values
-df_summary_stat_left["Fixation Dispersion Y Kurtosis [px]"] = df_final_left_groups_sti["Fixation Dispersion Y [px]"].apply(pd.DataFrame.kurt).values
+df_summary_stat_left["Fixation Dispersion X Kurtosis [px]"] = get_kurtosis("Fixation Dispersion X [px]")
+df_summary_stat_left["Fixation Dispersion Y Kurtosis [px]"] = get_kurtosis("Fixation Dispersion Y [px]")
 
 ## Saccade Amplitude
-sacc_ampl = df_final_left_groups_sti.agg({"Saccade Amplitude [°]": ["mean", "max", "min", "median", "std", "skew", lambda x: x.quantile(0.25), lambda x: x.quantile(0.75)]})
+sacc_ampl = df_final_left_groups_sti.agg({"Saccade Amplitude [°]": statistics})
 
 sacc_ampl.columns = ['sacc_ampl_mean', "sacc_ampl_max", "sacc_ampl_min", "sacc_ampl_median", "sacc_ampl_std", "sacc_ampl_skew",
 "sacc_ampl_q25", "sacc_ampl_q75"]
@@ -267,15 +224,14 @@ df_summary_stat_left[["Saccade Amplitude Mean [°]",
                         "Saccade Amplitude Quantil 25 [°]",
                         "Saccade Amplitude Quantil 75 [°]"]] = sacc_ampl
 
-df_summary_stat_left["Saccade Amplitude Kurtosis [°]"] = df_final_left_groups_sti["Saccade Amplitude [°]"].apply(pd.DataFrame.kurt).values
+df_summary_stat_left["Saccade Amplitude Kurtosis [°]"] = get_kurtosis("Saccade Amplitude [°]")
 
-sacc_features = df_final_left_groups_sti.agg({'Saccade Acceleration Average [°/s²]': ["mean", "max", "min", "median", "std", "skew",
- lambda x: x.quantile(0.25), lambda x: x.quantile(0.75)],
-       'Saccade Acceleration Peak [°/s²]': ["mean", "max", "min", "median", "std", "skew", lambda x: x.quantile(0.25), lambda x: x.quantile(0.75)], 
-       'Saccade Deceleration Peak [°/s²]': ["mean", "max", "min", "median", "std", "skew", lambda x: x.quantile(0.25), lambda x: x.quantile(0.75)], 
-       'Saccade Velocity Average [°/s]': ["mean", "max", "min", "median", "std", "skew", lambda x: x.quantile(0.25), lambda x: x.quantile(0.75)],
-       'Saccade Velocity Peak [°/s]': ["mean", "max", "min", "median", "std", "skew", lambda x: x.quantile(0.25), lambda x: x.quantile(0.75)],  
-       'Saccade Peak Velocity at [%]': ["mean", "max", "min", "median", "std", "skew", lambda x: x.quantile(0.25), lambda x: x.quantile(0.75)]})
+sacc_features = df_final_left_groups_sti.agg({'Saccade Acceleration Average [°/s²]': statistics,
+       'Saccade Acceleration Peak [°/s²]': statistics, 
+       'Saccade Deceleration Peak [°/s²]': statistics, 
+       'Saccade Velocity Average [°/s]': statistics,
+       'Saccade Velocity Peak [°/s]': statistics,  
+       'Saccade Peak Velocity at [%]': statistics})
 
 sacc_features.columns = ['sacc_acc_avg_mean', "sacc_acc_avg_max", "sacc_acc_avg_min", "sacc_acc_avg_median", "sacc_acc_avg_std", "sacc_acc_avg_skew", 
 "sacc_acc_avg_q25", "sacc_acc_avg_q75",
@@ -340,7 +296,6 @@ df_summary_stat_left[["Saccade Acceleration Average [°/s²] Mean",
                         "Saccade Velocity Peak [°/s²] Quantil 25]",
                         "Saccade Velocity Peak [°/s²] Quantil 75]",
 
-
                         "Saccade Velocity Peak [%] Mean", 
                         "Saccade Velocity Peak [%] Max", 
                         "Saccade Velocity Peak [%] Min",
@@ -351,25 +306,28 @@ df_summary_stat_left[["Saccade Acceleration Average [°/s²] Mean",
                         "Saccade Velocity Peak [%] Quantil 75]"
                         ]] = sacc_features
 
-df_summary_stat_left["Saccade Acceleration Average [°/s²] Kurtosis"] = df_final_left_groups_sti["Saccade Acceleration Average [°/s²]"].apply(pd.DataFrame.kurt).values
-df_summary_stat_left["Saccade Acceleration Peak [°/s²] Kurtosis"] = df_final_left_groups_sti["Saccade Acceleration Peak [°/s²]"].apply(pd.DataFrame.kurt).values
-df_summary_stat_left["Saccade Deceleration Peak [°/s²] Kurtosis"] = df_final_left_groups_sti["Saccade Deceleration Peak [°/s²]"].apply(pd.DataFrame.kurt).values
-df_summary_stat_left["Saccade Velocity Average [°/s²] Kurtosis"] = df_final_left_groups_sti["Saccade Velocity Average [°/s]"].apply(pd.DataFrame.kurt).values
-df_summary_stat_left["Saccade Velocity Peak [°/s²] Kurtosis"] = df_final_left_groups_sti["Saccade Velocity Peak [°/s]"].apply(pd.DataFrame.kurt).values
-df_summary_stat_left["Saccade Velocity Peak [%] Kurtosis"] = df_final_left_groups_sti["Saccade Peak Velocity at [%]"].apply(pd.DataFrame.kurt).values
+df_summary_stat_left["Saccade Acceleration Average [°/s²] Kurtosis"] = get_kurtosis("Saccade Acceleration Average [°/s²]")
+df_summary_stat_left["Saccade Acceleration Peak [°/s²] Kurtosis"] = get_kurtosis("Saccade Acceleration Peak [°/s²]")
+df_summary_stat_left["Saccade Deceleration Peak [°/s²] Kurtosis"] = get_kurtosis("Saccade Deceleration Peak [°/s²]")
+df_summary_stat_left["Saccade Velocity Average [°/s²] Kurtosis"] = get_kurtosis("Saccade Velocity Average [°/s]")
+df_summary_stat_left["Saccade Velocity Peak [°/s²] Kurtosis"] = get_kurtosis("Saccade Velocity Peak [°/s]")
+df_summary_stat_left["Saccade Velocity Peak [%] Kurtosis"] = get_kurtosis("Saccade Peak Velocity at [%]")
 
 ## Saccade Length: Distance of saccade in pixels
 # distanz = sqrt((end_X - start_x)^2 + (end_y - start_y)^2)
 
 # 1. calcualte distance and make new column in df
-x_dist = (df_final_left["Saccade End Position X [px]"].astype(float) - df_final_left["Saccade Start Position X [px]"].astype(float))**2 
-y_dist = (df_final_left["Saccade End Position Y [px]"].astype(float) - df_final_left["Saccade Start Position Y [px]"].astype(float))**2 
+def diff(start,end):
+    return (df_final_left[end].astype(float) - df_final_left[start].astype(float))**2 
+
+x_dist = diff("Saccade End Position X [px]", "Saccade Start Position X [px]" )
+y_dist = diff("Saccade End Position Y [px]", "Saccade Start Position Y [px]" )
 
 distance = np.sqrt(x_dist + y_dist)
 df_final_left["Saccade Length [px]"] = distance
 
 # 2 calcualte mean vor each video and so on
-sacc_length = df_final_left_groups_sti.agg({"Saccade Length [px]": ["mean", "max", "min", "median", "std", "skew", lambda x: x.quantile(0.25), lambda x: x.quantile(0.75)]})
+sacc_length = df_final_left_groups_sti.agg({"Saccade Length [px]": statistics})
 
 sacc_length.columns = ['sacc_length_mean', "sacc_length_max", "sacc_length_min", "sacc_length_median", "sacc_length_std", 
 "sacc_length_skew", "sacc_length_q25", "sacc_length_q75"]
@@ -384,12 +342,54 @@ df_summary_stat_left[["Saccade Length Mean [px]",
                         "Saccade Length Quantil 25 [px]]",
                         "Saccade Length Quantil 75 [px]]"]] = sacc_length
 
-df_summary_stat_left["Saccade Length Kurtosis [px]"] = df_final_left_groups_sti["Saccade Length [px]"].apply(pd.DataFrame.kurt).values
+df_summary_stat_left["Saccade Length Kurtosis [px]"] = get_kurtosis("Saccade Length [px]")
 
 print(df_summary_stat_left)
 
-#### todo ###
 ##Pupil diameters 
+
+# pupil size with emotions
+# we need a baseline, where the Person is neutral, before experiment
+# I can use everything before video1 from raw data
+# standardization wie value/devided by mean from before
+# than we can calculate sd, mean, etc. 
+# get neutral pupil size before video1 starts as a baseline for pupilsize
+# for all VP different!!!!,have to change the data
+
+df_raw_data = pd.read_csv(r"W:\WCT\04_Mind-Wandering-Labstudy\04_Daten\02_BeGaze\SMI_RawData\Raw Data - Raw Data - 01.txt"
+, na_values = "-", usecols= ["Stimulus", "Pupil Diameter Left [mm]", "Pupil Diameter Right [mm]"])
+
+df_welcome_to_instruction = df_raw_data.loc[(df_raw_data["Stimulus"] == "welcome") | (df_raw_data["Stimulus"] == "transition1") 
+| (df_raw_data["Stimulus"] == 'https://www.unipark.de/uc/Mind-Wandering/510e') 
+| (df_raw_data["Stimulus"] == "https://www.unipark.de/uc/Mind-Wandering/510e/ospe.php?qb")
+| (df_raw_data["Stimulus"] == "instruction")
+]
+
+pupil_diameter_right_mean = df_welcome_to_instruction["Pupil Diameter Right [mm]"].mean()
+pupil_diameter_left_mean = df_welcome_to_instruction["Pupil Diameter Left [mm]"].mean()
+
+#Pupil diameters 
+#for each participant different pupils, but we want to compare them
+# that why we need a way to standaralize them, devide them by a baseline, which we get from data before watching the video
+#import features_pupil_diameter
+
+# divide all pupil diameters for fixation in the last 10 seconds with pupil mean
+df_final_left["Fixation Average Pupil Diameter [mm] standardized"] = df_final_left.loc[:, "Fixation Average Pupil Diameter [mm]"]/pupil_diameter_left_mean #.std()
+
+# summary statistics
+df_summary_stat_left[["Fixation Average Pupil Diameter [mm] Mean",
+"Fixation Average Pupil Diameter [mm] Max",
+"Fixation Average Pupil Diameter [mm] Min",
+"Fixation Average Pupil Diameter [mm] Median",
+"Fixation Average Pupil Diameter [mm] Std",
+"Fixation Average Pupil Diameter [mm] Skew",
+"Fixation Average Pupil Diameter [mm] Quantil25",
+"Fixation Average Pupil Diameter [mm] Quantil75"]] = df_final_left_groups_sti.agg({"Fixation Average Pupil Diameter [mm] standardized":
+statistics})
+
+df_summary_stat_left["Fixation Average Pupil Diameter [mm] Kurtosis"] = get_kurtosis("Fixation Average Pupil Diameter [mm] standardized")
+
+#### todo ###
 ##Vergence
 
 
