@@ -185,6 +185,8 @@ def cut_last_10sec_of_videos(df: pd.DataFrame) -> pd.DataFrame:
     return df_concat
 
 ### summary statistics for one Eye ###
+
+# probleme bei file 82
 def get_kurtosis(df_groups_stimulus: pd.DataFrame, feature: str):
     """
     returns kurtosis
@@ -544,7 +546,8 @@ def main():
     os.chdir("C:/Users/Julia/Desktop/Daten-BA/SMI_Eventstatistics") 
     #get all files in directory
     list = os.listdir() 
-   
+    # remove participants
+    list.remove("Event Statistics - Single - 82.txt")
     for filename in list:
         print(filename)
         # input: filename # output: dataframe to work on
