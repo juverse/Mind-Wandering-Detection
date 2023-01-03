@@ -4,6 +4,7 @@
 import pandas as pd 
 import numpy as np
 import os
+import vergence_raw_data as vergence
 
 ###
 # Define paths
@@ -41,7 +42,8 @@ def write_data(df, eye):
         final summary statiscs for one eye
         left or right eye
     """
-    df.to_csv('W:WCT/04_Mind-Wandering-Labstudy/04_Daten/04_Prepared_data/00_Julia/summary_statistics'+eye+".txt", index = False, sep=',')
+    df.to_csv('C:/Users/Julia/Desktop/'+eye+".csv", index = False)
+    #df.to_csv('W:WCT/04_Mind-Wandering-Labstudy/04_Daten/04_Prepared_data/00_Julia/summary_statistics'+eye+".txt", index = False, sep=',')
 
 def drop_unused_columns(df_all: pd.DataFrame) -> pd.DataFrame:
     """
@@ -121,7 +123,6 @@ def df_prepare_eye_tracking_data(df: pd.DataFrame):
     
     df_concat_blink = df_substractive_baseline_correction.loc[(df_substractive_baseline_correction["Category"] != "Blink") |
                                     ((df_substractive_baseline_correction["Category"] == "Blink") & (df_substractive_baseline_correction["Event Duration [ms]"] < blink_threshold))]
-    print(df_concat_blink)
     ## split data in right and left eye => just take one eye for statistics
     df_final_left = df_concat_blink.loc[df_concat_blink["Eye L/R"] == "Left", :]
     df_final_right = df_concat_blink.loc[df_concat_blink["Eye L/R"] == "Right", :]
@@ -177,7 +178,7 @@ def cut_last_10sec_of_videos(df: pd.DataFrame) -> pd.DataFrame:
     ## necessary data together
     df_concat = pd.DataFrame()
     for i in range(1,16):
-        # hier existiert einmal ein video nicht,, vp 13
+        # hier existiert einmal ein video nicht, vp 13
         # if abfrage ob das vid existiert
         if "vid" + str(i) in df_split.groups.keys():
             df_temp = pd.DataFrame(df_split.get_group("vid" + str(i)))
@@ -186,7 +187,6 @@ def cut_last_10sec_of_videos(df: pd.DataFrame) -> pd.DataFrame:
 
 ### summary statistics for one Eye ###
 
-# probleme bei file 82
 def get_kurtosis(df_groups_stimulus: pd.DataFrame, feature: str):
     """
     returns kurtosis
@@ -279,12 +279,11 @@ def summary_statistics(df: pd.DataFrame) -> pd.DataFrame:
     #groupby left for the videos
     df_groups_sti = df.groupby("Stimulus") 
     df_groups_sti_cat = df.groupby(["Stimulus", "Category"]) # das benutze ich nur für event duration und blink duration
-    # summary statistics
+   
     df_summary_stat = pd.DataFrame(index = ["vid1","vid10","vid11","vid12","vid13","vid14","vid15","vid2","vid3","vid4","vid5","vid6","vid7","vid8","vid9"])
     
     ## add general information
-    # problem ist hier, ich brauche df_summary_stat mit 15 videos, da bei tracking ratio es rausfällt
-    df_summary_stat["Tracking Ratio [%] Mean"] = df_groups_sti["Tracking Ratio [%]"].mean()#.reset_index() finde einen weg wie ich den Index verändern kann, entweder zu vid oder zu nummern 
+    df_summary_stat["Tracking Ratio [%] Mean"] = df_groups_sti["Tracking Ratio [%]"].mean()
     df_summary_stat["Stimulus"] = ["vid1","vid10","vid11","vid12","vid13","vid14","vid15","vid2","vid3","vid4","vid5","vid6","vid7","vid8","vid9"]
     df_summary_stat["Participant"] = [df.loc[:,"Participant"].values[0]] * 15
     
@@ -296,8 +295,7 @@ def summary_statistics(df: pd.DataFrame) -> pd.DataFrame:
     
     ## Fixation Duration
     # add Fixation duration to dataframe
-    df_fixation_duration = get_one_event_statistics_event_duration(df_statistics_event_duration, "Fixation").reset_index() #array, no df pr panda series(only for 1dimensional)
-    #df_summary_stat = pd.concat([df_summary_stat, df_fixation_duration], axis=1)
+
     df_summary_stat[["Fixation Duration Mean [ms]", 
                             "Fixation Duration Max [ms]", 
                             "Fixation Duration Min [ms]",
@@ -318,7 +316,6 @@ def summary_statistics(df: pd.DataFrame) -> pd.DataFrame:
                             "Saccade Duration Quantil 25 [ms]",
                             "Saccade Duration Quantil 75 [ms]"]] = get_one_event_statistics_event_duration(df_statistics_event_duration, "Saccade")
 
-    #print(get_one_event_statistics_event_duration(df_statistics_event_duration, "Blink"))
     ## Mean Duration of Blink
     #brauche ich hier die anderen-> max, min??
     df_summary_stat[["Blink Duration Mean [ms]", 
@@ -333,12 +330,10 @@ def summary_statistics(df: pd.DataFrame) -> pd.DataFrame:
     # kurtosis
     kurt = df_groups_sti_cat["Event Duration [ms]"].apply(pd.DataFrame.kurt)
     kurt = kurt.reset_index()
-    # add to dataframe 
-    #df_summary_stat["Fixation Duration Kurtosis [ms]"] = kurt.loc[kurt["Category"]=="Fixation", "Event Duration [ms]"].values
-
-    #df_summary_stat["Saccade Duration Kurtosis [ms]"] = pd.Series(kurt.loc[kurt["Category"]=="Saccade", ["Stimulus","Event Duration [ms]"]].values)
-    #df_summary_stat["Blink Duration Kurtosis [ms]"] = kurt.loc[kurt["Category"]=="Blink", "Event Duration [ms]"].values
-    #values otherwise we would add NaN, because of the indexes
+   
+    df_summary_stat["Fixation Duration Kurtosis [ms]"] = kurt.loc[kurt["Category"]=="Fixation",:].reset_index().set_index("Stimulus")["Event Duration [ms]"]
+    df_summary_stat["Saccade Duration Kurtosis [ms]"] = kurt.loc[kurt["Category"]=="Saccade",:].reset_index().set_index("Stimulus")["Event Duration [ms]"]
+    df_summary_stat["Blink Duration Kurtosis [ms]"] = kurt.loc[kurt["Category"]=="Blink", :].reset_index().set_index("Stimulus")["Event Duration [ms]"]
 
     ## saccade fixation ratio
     df_summary_stat["Fixation Saccade Ratio Mean"] = get_saccade_fixation_ratio(df_summary_stat, "Fixation Duration Mean [ms]","Saccade Duration Mean [ms]")
@@ -347,7 +342,7 @@ def summary_statistics(df: pd.DataFrame) -> pd.DataFrame:
     df_summary_stat["Fixation Saccade Ratio Median"] = get_saccade_fixation_ratio(df_summary_stat,"Fixation Duration Median [ms]","Saccade Duration Median [ms]" )
     df_summary_stat["Fixation Saccade Ratio Std"] = get_saccade_fixation_ratio(df_summary_stat,"Fixation Duration Std [ms]", "Saccade Duration Std [ms]")
     df_summary_stat["Fixation Saccade Ratio Skew"] = get_saccade_fixation_ratio(df_summary_stat,"Fixation Duration Skew [ms]","Saccade Duration Skew [ms]" )
-    #df_summary_stat["Fixation Saccade Ratio Kurtosis"] = get_saccade_fixation_ratio(df_summary_stat, "Fixation Duration Kurtosis [ms]","Saccade Duration Kurtosis [ms]") #.values
+    df_summary_stat["Fixation Saccade Ratio Kurtosis"] = get_saccade_fixation_ratio(df_summary_stat, "Fixation Duration Kurtosis [ms]","Saccade Duration Kurtosis [ms]")
 
     ## Fixation Number
     # take on fixation value and count how often it appears
@@ -391,7 +386,6 @@ def summary_statistics(df: pd.DataFrame) -> pd.DataFrame:
 
     sacc_ampl.columns = ['sacc_ampl_mean', "sacc_ampl_max", "sacc_ampl_min", "sacc_ampl_median", "sacc_ampl_std", "sacc_ampl_skew",
     "sacc_ampl_q25", "sacc_ampl_q75"]
-    #sacc_ampl = sacc_ampl.reset_index()
 
     df_summary_stat[["Saccade Amplitude Mean [°]", 
                             "Saccade Amplitude Max [°]", 
@@ -492,19 +486,18 @@ def summary_statistics(df: pd.DataFrame) -> pd.DataFrame:
     ## Saccade Length: Distance of saccade in pixels
     # distanz = sqrt((end_X - start_x)^2 + (end_y - start_y)^2)
 
-    # 1. calcualte distance and make new column in df
+    # calcualte distance and make new column in df
     x_dist = diff(df,"Saccade End Position X [px]", "Saccade Start Position X [px]" )
     y_dist = diff(df,"Saccade End Position Y [px]", "Saccade Start Position Y [px]" )
 
     distance = np.sqrt(x_dist + y_dist)
     df["Saccade Length [px]"] = distance
 
-    # 2 calcualte mean vor each video and so on
+    # calcualte mean vor each video and so on
     sacc_length = df_groups_sti.agg({"Saccade Length [px]": statistics})
 
     sacc_length.columns = ['sacc_length_mean', "sacc_length_max", "sacc_length_min", "sacc_length_median", "sacc_length_std", 
     "sacc_length_skew", "sacc_length_q25", "sacc_length_q75"]
-    #sacc_ampl = sacc_ampl.reset_index()
 
     df_summary_stat[["Saccade Length Mean [px]", 
                             "Saccade Length Max [px]", 
@@ -528,9 +521,7 @@ def summary_statistics(df: pd.DataFrame) -> pd.DataFrame:
     "Fixation Average Pupil Diameter [mm] Quantil75"]] = df_groups_sti.agg({"Fixation Average Pupil Diameter [mm] subtractive baseline correction": statistics})
     
     df_summary_stat["Fixation Average Pupil Diameter [mm] Kurtosis"] = get_kurtosis(df_groups_sti, "Fixation Average Pupil Diameter [mm] subtractive baseline correction")
-    
-    #### todo ###
-    ##Vergence
+     
     return df_summary_stat
  
 def main():
@@ -542,6 +533,7 @@ def main():
     list = [f'{i:>02}' for i in [1, 2, 3, 4, 5, 6, 7, 9, 10, 12, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 26, 27, 28, 29, 30, 31, 32, 33, 34, 
    35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46,48, 51, 55,57,58,60, 62,64,65,66,67,69,72, 73,74,75,76,77,78,79,80,81, 84,85,86,88,90,91,92,95]]
 
+    
     #navigate to directory
     os.chdir("C:/Users/Julia/Desktop/Daten-BA/SMI_Eventstatistics") 
     #get all files in directory
@@ -568,6 +560,11 @@ def main():
 
         df_summary_statistic_left_eye_all_participants = pd.concat([df_summary_statistic_left_eye_all_participants, df_summary_statistics_left_eye])
         #df_summary_statistic_right_eye_all_participants = pd.concat([df_summary_statistic_right_eye_all_participants, df_summary_statistics_right_eye])
+    
+    # vergence
+    veregence_all_participanats = vergence.all_angles()
+    df_summary_statistic_left_eye_all_participants.join(veregence_all_participanats, how='left', lsuffix='_event_statistics', rsuffix='_raw_data')
+    
     
     #write_data(pd.DataFrame(df_summary_statistics_left_eye), "_left_eye_all_participants")
     write_data(pd.DataFrame(df_summary_statistic_left_eye_all_participants), "_left_eye_all_participants")
