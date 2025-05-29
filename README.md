@@ -1,1 +1,1 @@
-# Bachelorarbeit-Mind-Wandering
+# Mind-Wandering-Detection
