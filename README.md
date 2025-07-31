@@ -1,1 +1,7 @@
 # Mind-Wandering-Detection
+Online learning has become more popular in Germany recently. 
+During watching a video lecture is mind wandering (MW) a common phenom.
+MW is the shifting of attention from task-related processing to internal, task-unrelated thoughts. It can have negative and positive effects on learning. Therefore, to improve online learning, I try to predict MW and finer distinctions such as the Meta-Awareness of MW and different thought contents during a recorded lecture using eye-tracking. MW was measured with the probe-caught method during lecture viewing. 
+Supervised machine learning classifiers, including Multilayer Perceptron, Naive Bayes, Random Forest, Support Vector Classifier, and eXtreme Gradient Boosting, were trained on stimulus-independent global features such as vergence, fixation, and saccade.
+My results showed that while all models outperformed the chance baseline score of 0.384, the Multilayer Perceptron was the best at MW detection with an F1 score of 0.529. For thought content detection, all models except Naive Bayes outperformed with a chance baseline score of 0.340. Extreme Gradient Boosting achieved the highest macro F1 score of 0.427. However, none of the classifiers significantly outperformed the chance baseline score for Meta-Awareness detection, likely due to little and unbalanced data.
+The results have contributed to improving online learning experiences, as the learning software could adapt to thoughts with different learning outcomes.
